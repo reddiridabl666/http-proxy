@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
+	"time"
 
 	"http-proxy/pkg/utils"
 )
@@ -19,15 +21,14 @@ func Handler(w http.ResponseWriter, toProxy *http.Request) {
 		return
 	}
 
-	conn, err := net.Dial("tcp", req.Host+":80")
+	bytes, err := httputil.DumpRequest(req, true)
 	if err != nil {
 		utils.WriteError(err, w)
 		return
 	}
-
-	bytes, err := httputil.DumpRequest(req, true)
 	fmt.Println(string(bytes))
 
+	conn, err := net.DialTimeout("tcp", getHost(toProxy.URL), time.Second*5)
 	if err != nil {
 		utils.WriteError(err, w)
 		return
@@ -44,6 +45,8 @@ func Handler(w http.ResponseWriter, toProxy *http.Request) {
 		utils.WriteError(err, w)
 		return
 	}
+
+	defer resp.Body.Close()
 
 	err = utils.WriteResponse(resp, w)
 	if err != nil {
@@ -62,4 +65,23 @@ func NewRequest(r *http.Request) (*http.Request, error) {
 	res.Header.Del("Proxy-Connection")
 
 	return res, nil
+}
+
+func getHost(url *url.URL) string {
+	return url.Hostname() + ":" + getPort(url)
+}
+
+func getPort(url *url.URL) string {
+	port := url.Port()
+
+	if port == "" {
+		switch url.Scheme {
+		case "https":
+			port = "443"
+		default:
+			port = "80"
+		}
+	}
+
+	return port
 }
