@@ -12,46 +12,31 @@ import (
 	"http-proxy/pkg/utils"
 )
 
-// var client http.Client
+func Handle(conn net.Conn) error {
+	reader := bufio.NewReader(conn)
 
-func Handler(w http.ResponseWriter, toProxy *http.Request) {
+	req, err := http.ReadRequest(reader)
+	if err != nil {
+		return err
+	}
+
+	return handleRequest(conn, req)
+}
+
+func handleRequest(conn net.Conn, toProxy *http.Request) error {
 	req, err := NewRequest(toProxy)
 	if err != nil {
-		utils.WriteError(err, w)
-		return
+		return err
 	}
 
-	bytes, err := httputil.DumpRequest(req, true)
+	resp, err := sendRequest(req, toProxy.URL)
 	if err != nil {
-		utils.WriteError(err, w)
-		return
-	}
-	fmt.Println(string(bytes))
-
-	conn, err := net.DialTimeout("tcp", getHost(toProxy.URL), time.Second*5)
-	if err != nil {
-		utils.WriteError(err, w)
-		return
-	}
-
-	_, err = conn.Write(bytes)
-	if err != nil {
-		utils.WriteError(err, w)
-		return
-	}
-
-	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
-	if err != nil {
-		utils.WriteError(err, w)
-		return
+		return err
 	}
 
 	defer resp.Body.Close()
 
-	err = utils.WriteResponse(resp, w)
-	if err != nil {
-		fmt.Printf("Error responding to client %s: %s\n", toProxy.RemoteAddr, err)
-	}
+	return utils.WriteResponse(resp, conn)
 }
 
 func NewRequest(r *http.Request) (*http.Request, error) {
@@ -65,6 +50,26 @@ func NewRequest(r *http.Request) (*http.Request, error) {
 	res.Header.Del("Proxy-Connection")
 
 	return res, nil
+}
+
+func sendRequest(req *http.Request, originalURL *url.URL) (*http.Response, error) {
+	bytes, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(string(bytes))
+
+	conn, err := net.DialTimeout("tcp", getHost(originalURL), time.Second*5)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = conn.Write(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return http.ReadResponse(bufio.NewReader(conn), req)
 }
 
 func getHost(url *url.URL) string {
