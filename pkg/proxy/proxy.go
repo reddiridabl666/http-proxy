@@ -10,15 +10,17 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"http-proxy/pkg/utils"
 )
 
 type Handler struct {
-	certs     map[string][]byte
-	tlsConfig *tls.Config
-	key       []byte
+	certs map[string][]byte
+	mutex sync.Mutex
+	// tlsConfig *tls.Config
+	key []byte
 }
 
 func NewHandler() (*Handler, error) {
@@ -27,15 +29,9 @@ func NewHandler() (*Handler, error) {
 		return nil, err
 	}
 
-	cert, err := tls.LoadX509KeyPair("ca.crt", "ca.key")
-	if err != nil {
-		return nil, err
-	}
-
 	return &Handler{
-		certs:     make(map[string][]byte, 4),
-		tlsConfig: &tls.Config{Certificates: []tls.Certificate{cert}},
-		key:       keyBytes,
+		certs: make(map[string][]byte, 4),
+		key:   keyBytes,
 	}, nil
 }
 
@@ -52,32 +48,30 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 	var hostConn net.Conn
 	var err error
 
+	utils.PrintRequest(toProxy)
+
+	host := toProxy.URL.Hostname()
+	port := getPort(toProxy.URL)
+
 	if toProxy.Method == http.MethodConnect {
-		err := h.handleHTTPS(clientConn, toProxy)
+		clientConn, err = h.tlsUpgrade(clientConn, host)
 		if err != nil {
 			return err
 		}
 
-		clientConn = tls.Server(clientConn, h.tlsConfig)
-
 		fmt.Println("Reading the actual request")
-		readBytes := []byte{}
-		clientConn.SetReadDeadline(time.Now().Add(defaultTimeout))
-
-		// _, err = clientConn.Read(readBytes)
 		toProxy, err = http.ReadRequest(bufio.NewReader(clientConn))
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(string(readBytes))
-
-		hostConn, err = h.tlsConnect(getHost(toProxy.URL))
+		fmt.Println("Connecting to host: " + host)
+		hostConn, err = h.tlsConnect(host, port)
 		if err != nil {
 			return err
 		}
 	} else {
-		hostConn, err = tcpConnect(getHost(toProxy.URL))
+		hostConn, err = tcpConnect(host, port)
 		if err != nil {
 			return err
 		}
@@ -88,6 +82,7 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 		return err
 	}
 
+	fmt.Println("Proxying request to host: " + host + "\n")
 	resp, err := h.sendRequest(hostConn, req)
 	if err != nil {
 		return err
@@ -100,39 +95,62 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 
 const defaultTimeout = time.Second * 5
 
-func tcpConnect(host string) (net.Conn, error) {
-	return net.DialTimeout("tcp", host, defaultTimeout)
+func tcpConnect(host, port string) (net.Conn, error) {
+	return net.DialTimeout("tcp", host+":"+port, defaultTimeout)
 }
 
-func (h *Handler) tlsConnect(host string) (net.Conn, error) {
+func (h *Handler) tlsConnect(host, port string) (net.Conn, error) {
+	dialer := tls.Dialer{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+	conn, err := dialer.DialContext(ctx, "tcp", host+":"+port)
+
+	return conn, err
+}
+
+func (h *Handler) getTlsConfig(host string) (*tls.Config, error) {
 	cert, err := tls.X509KeyPair(h.certs[host], h.key)
 	if err != nil {
 		return nil, err
 	}
-
-	dialer := tls.Dialer{
-		Config: &tls.Config{Certificates: []tls.Certificate{cert}},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	return dialer.DialContext(ctx, "tcp", host)
+	return &tls.Config{Certificates: []tls.Certificate{cert}}, nil
 }
 
-func (h *Handler) handleHTTPS(conn net.Conn, r *http.Request) error {
-	_, err := conn.Write([]byte("HTTP/1.0 200 Connection established\n"))
+func (h *Handler) tlsUpgrade(clientConn net.Conn, host string) (net.Conn, error) {
+	_, err := clientConn.Write([]byte("HTTP/1.0 200 Connection established\n\n"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, exists := h.certs[r.Host]
+	err = h.generateCertificate(host)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := h.getTlsConfig(host)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConn := tls.Server(clientConn, cfg)
+	clientConn.SetReadDeadline(time.Now().Add(defaultTimeout))
+
+	return tlsConn, nil
+}
+
+func (h *Handler) generateCertificate(host string) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	_, exists := h.certs[host]
 	if !exists {
-		cert, err := generateCertificate(r)
+		fmt.Printf("Generating certificate for %s\n", host)
+		cert, err := generateCertificate(host)
 		if err != nil {
 			return fmt.Errorf("error generating certificate: %v", err)
 		}
-		h.certs[r.Host] = cert
+		h.certs[host] = cert
 	}
 
 	return nil
@@ -157,7 +175,7 @@ func (h *Handler) sendRequest(conn net.Conn, req *http.Request) (*http.Response,
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(string(bytes))
+	// fmt.Println(string(bytes))
 
 	_, err = conn.Write(bytes)
 	if err != nil {
@@ -165,10 +183,6 @@ func (h *Handler) sendRequest(conn net.Conn, req *http.Request) (*http.Response,
 	}
 
 	return http.ReadResponse(bufio.NewReader(conn), req)
-}
-
-func getHost(url *url.URL) string {
-	return url.Hostname() + ":" + getPort(url)
 }
 
 func getPort(url *url.URL) string {
