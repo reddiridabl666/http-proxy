@@ -2,12 +2,33 @@ package proxy
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 )
+
+func loadCertificates() (map[string][]byte, error) {
+	entries, err := os.ReadDir("certs")
+	if err != nil {
+		return nil, err
+	}
+
+	res := make(map[string][]byte, len(entries))
+
+	for _, entry := range entries {
+		host := strings.TrimSuffix(entry.Name(), ".crt")
+
+		res[host], err = os.ReadFile(entry.Name())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return res, nil
+}
 
 func generateCertificate(host string) ([]byte, error) {
 	cmd := exec.Command("./gen.sh", host)
@@ -16,8 +37,7 @@ func generateCertificate(host string) ([]byte, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		panic("Certificate creation failure: " + err.Error())
-		// return nil, err
+		return nil, err
 	}
 
 	res := []byte(out.String())
@@ -29,28 +49,15 @@ func generateCertificate(host string) ([]byte, error) {
 
 	defer cert.Close()
 
-	if len(res) == 0 {
-		panic("Certificate creation failure: nothing returned from script")
-	}
-
-	i := 0
 	var written int64 = 0
 
-	for i < 5 {
-		written, err = io.Copy(cert, bytes.NewReader(res))
-		if err != nil {
-			panic("Certificate creation failure: " + err.Error())
-			// return nil, e
-		}
-
-		if written > 0 {
-			break
-		}
-
+	written, err = io.Copy(cert, bytes.NewReader(res))
+	if err != nil {
+		return nil, err
 	}
 
 	if written == 0 {
-		panic("Certificate creation failure: nothing written")
+		return nil, errors.New("0 bytes written during certificate creation")
 	}
 
 	return res, nil

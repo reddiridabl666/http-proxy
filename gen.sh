@@ -1,15 +1,8 @@
-#!/usr/bin/env bash
-
-if [ -z "$1" ]
-then
-  echo "Please supply a subdomain to create a certificate for";
-  echo "e.g. www.mysite.com"
-  exit -1;
-fi
+#!/bin/sh
 
 COMMON_NAME=$1
 SUBJECT="/C=CA/ST=None/L=NB/O=None/CN=$COMMON_NAME"
-NUM_OF_DAYS=825
+NUM_OF_DAYS=3650
 
 cat v3.ext | sed s/%%DOMAIN%%/"$COMMON_NAME"/g > /tmp/__v3.ext
 openssl req -new -newkey rsa:2048 -sha256 -nodes -key cert.key -config /tmp/__v3.ext -subj "$SUBJECT" -out device.csr

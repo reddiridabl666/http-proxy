@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 )
 
@@ -23,6 +24,11 @@ func PrintRequest(r *http.Request) {
 	fmt.Println(string(bytes))
 }
 
+func PrintResponse(r *http.Response, body bool) {
+	bytes, _ := httputil.DumpResponse(r, body)
+	fmt.Println(string(bytes))
+}
+
 func WriteResponse(resp *http.Response, conn net.Conn) error {
 	bytes, err := httputil.DumpResponse(resp, true)
 	if err != nil {
@@ -31,4 +37,19 @@ func WriteResponse(resp *http.Response, conn net.Conn) error {
 
 	_, err = conn.Write(bytes)
 	return err
+}
+
+func GetPort(url *url.URL) string {
+	port := url.Port()
+
+	if port == "" {
+		switch url.Scheme {
+		case "https":
+			port = "443"
+		default:
+			port = "80"
+		}
+	}
+
+	return port
 }
