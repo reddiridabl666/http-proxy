@@ -21,7 +21,7 @@ func loadCertificates() (map[string][]byte, error) {
 	for _, entry := range entries {
 		host := strings.TrimSuffix(entry.Name(), ".crt")
 
-		res[host], err = os.ReadFile(entry.Name())
+		res[host], err = os.ReadFile("certs/" + entry.Name())
 		if err != nil {
 			return nil, err
 		}
@@ -31,7 +31,7 @@ func loadCertificates() (map[string][]byte, error) {
 }
 
 func generateCertificate(host string) ([]byte, error) {
-	cmd := exec.Command("./gen.sh", host)
+	cmd := exec.Command("./https/gen.sh", host)
 	var out strings.Builder
 	cmd.Stdout = &out
 

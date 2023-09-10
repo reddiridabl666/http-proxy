@@ -10,17 +10,20 @@ import (
 	"sync"
 	"time"
 
+	"http-proxy/pkg/repo"
 	"http-proxy/pkg/utils"
 )
 
 type Handler struct {
-	certs map[string][]byte
-	mutex sync.Mutex
-	key   []byte
+	certs         map[string][]byte
+	mutex         sync.Mutex
+	key           []byte
+	requestSaver  repo.RequestSaver
+	responseSaver repo.ResponseSaver
 }
 
-func NewHandler() (*Handler, error) {
-	keyBytes, err := os.ReadFile("cert.key")
+func NewHandler(req repo.RequestSaver, resp repo.ResponseSaver) (*Handler, error) {
+	keyBytes, err := os.ReadFile("https/cert.key")
 	if err != nil {
 		return nil, err
 	}
@@ -31,8 +34,10 @@ func NewHandler() (*Handler, error) {
 	}
 
 	return &Handler{
-		certs: certs,
-		key:   keyBytes,
+		certs:         certs,
+		key:           keyBytes,
+		requestSaver:  req,
+		responseSaver: resp,
 	}, nil
 }
 
@@ -79,14 +84,13 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 	}
 
 	prepareRequest(toProxy)
+	_, err = h.requestSaver.Save(toProxy)
+	if err != nil {
+		return err
+	}
 
 	// fmt.Println("Proxying request to host: " + host + "\n")
 	resp, err := sendRequest(hostConn, toProxy)
-
-	if resp.StatusCode >= 300 {
-		utils.PrintResponse(resp, false)
-	}
-
 	if err != nil {
 		return err
 	}

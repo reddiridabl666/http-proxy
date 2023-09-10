@@ -4,7 +4,7 @@ COPY . project
 
 RUN cd project && \
     go build -o http-proxy http-proxy/app && \
-    chmod +x gen.sh && \
+    chmod +x https/gen.sh && \
     mkdir certs && \
     apk add openssl
 
