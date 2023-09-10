@@ -22,10 +22,10 @@ func (s *MongoResponseSaver) Save(resp *http.Response) (string, error) {
 	return "", nil
 }
 
-func (s *MongoResponseSaver) Get(id int64) (*http.Response, error) {
+func (s *MongoResponseSaver) Get(id string) (*http.Response, error) {
 	return nil, nil
 }
 
-func (s *MongoResponseSaver) List() ([]*http.Response, error) {
+func (s *MongoResponseSaver) List(limit int64) ([]*http.Response, error) {
 	return nil, nil
 }

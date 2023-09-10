@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const kRequests = "requests"
@@ -64,12 +65,47 @@ func (s *MongoRequestSaver) Save(req *http.Request) (string, error) {
 	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
-func (s *MongoRequestSaver) Get(id int64) (*http.Request, error) {
+func (s *MongoRequestSaver) Get(id string) (*http.Request, error) {
+	res := s.requests.FindOne(context.Background(), bson.D{{Key: "_id", Value: id}})
+	value := bson.M{}
+
+	err := res.Decode(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return toRequest(value)
+}
+
+func toRequest(value bson.M) (*http.Request, error) {
 	return nil, nil
 }
 
-func (s *MongoRequestSaver) List() ([]*http.Request, error) {
-	return nil, nil
+func (s *MongoRequestSaver) List(limit int64) ([]*http.Request, error) {
+	ctx := context.Background()
+
+	cursor, err := s.requests.Find(ctx, bson.D{}, options.Find().SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*http.Request, limit/4)
+
+	for cursor.Next(ctx) {
+		value := bson.M{}
+		err = cursor.Decode(value)
+		if err != nil {
+			return nil, err
+		}
+
+		req, err := toRequest(value)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, req)
+	}
+
+	return res, nil
 }
 
 func parseHeaders(headers http.Header) bson.M {
@@ -81,7 +117,6 @@ func parseHeaders(headers http.Header) bson.M {
 func parseQuery(input *url.URL) bson.M {
 	input.RawQuery = strings.ReplaceAll(input.RawQuery, ";", "&")
 	res := toBson(input.Query())
-	delete(res, "Cookie")
 	return res
 }
 
