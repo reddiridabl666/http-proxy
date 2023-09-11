@@ -84,7 +84,7 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 	}
 
 	prepareRequest(toProxy)
-	_, err = h.requestSaver.Save(toProxy)
+	requestId, err := h.requestSaver.Save(toProxy)
 	if err != nil {
 		return err
 	}
@@ -96,6 +96,8 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 	}
 
 	defer resp.Body.Close()
+
+	h.responseSaver.Save(requestId, resp)
 
 	return utils.WriteResponse(resp, clientConn)
 }

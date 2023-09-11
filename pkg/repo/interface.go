@@ -15,9 +15,10 @@ type RequestSaver interface {
 }
 
 type ResponseSaver interface {
-	Save(*http.Response) (string, error)
-	Get(id string) (*http.Response, error)
-	List(limit int64) ([]*http.Response, error)
+	Save(requestId string, resp *http.Response) (string, error)
+	Get(id string) (*ResponseData, error)
+	GetByRequest(requestId string) (*ResponseData, error)
+	List(limit int64) ([]*ResponseData, error)
 }
 
 const kDatabase = "http-proxy"
@@ -32,4 +33,13 @@ type RequestData struct {
 	Headers    bson.M             `json:"headers"`
 	GetParams  bson.M             `json:"get_params" bson:"get_params"`
 	PostParams bson.M             `json:"post_params" bson:"post_params"`
+}
+
+type ResponseData struct {
+	Id        primitive.ObjectID `json:"id" bson:"_id"`
+	RequestId primitive.ObjectID `json:"request_id" bson:"request_id"`
+	Code      int                `json:"code"`
+	Message   string             `json:"message"`
+	Body      string             `json:"body,omitempty" bson:"body,omitempty"`
+	Headers   bson.M             `json:"headers"`
 }

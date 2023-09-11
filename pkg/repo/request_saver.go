@@ -97,16 +97,11 @@ func (s *MongoRequestSaver) List(limit int64) ([]*RequestData, error) {
 		return nil, err
 	}
 
-	res := make([]*RequestData, limit/4)
+	res := make([]*RequestData, 0, limit/2)
 
-	for cursor.Next(ctx) {
-		value := &RequestData{}
-		err = cursor.Decode(value)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, value)
+	err = cursor.All(ctx, &res)
+	if err != nil {
+		return nil, err
 	}
 
 	return res, nil

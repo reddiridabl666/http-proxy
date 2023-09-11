@@ -13,6 +13,7 @@ import (
 func prepareRequest(r *http.Request) {
 	r.URL.Host = ""
 	r.Header.Del("Proxy-Connection")
+	r.Header.Del("Accept-Encoding")
 }
 
 func sendRequest(conn net.Conn, req *http.Request) (*http.Response, error) {

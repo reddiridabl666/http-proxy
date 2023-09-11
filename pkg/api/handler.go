@@ -88,3 +88,56 @@ func (h *Handler) RepeatRequest(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 	w.Write(bytes)
 }
+
+func (h *Handler) GetResponse(w http.ResponseWriter, r *http.Request) {
+	req, err := h.responses.Get(mux.Vars(r)["id"])
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	bytes, err := json.Marshal(req)
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	w.Write(bytes)
+}
+
+func (h *Handler) GetRequestResponse(w http.ResponseWriter, r *http.Request) {
+	req, err := h.responses.GetByRequest(mux.Vars(r)["id"])
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	bytes, err := json.Marshal(req)
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	w.Write(bytes)
+}
+
+func (h *Handler) ListResponses(w http.ResponseWriter, r *http.Request) {
+	limit, err := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 64)
+	if err != nil {
+		limit = kDefaultListSize
+	}
+
+	requests, err := h.responses.List(limit)
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	bytes, err := json.Marshal(requests)
+	if err != nil {
+		utils.HttpError(err, w)
+		return
+	}
+
+	w.Write(bytes)
+}
