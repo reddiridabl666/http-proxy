@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
+	"http-proxy/pkg/api"
 	"http-proxy/pkg/proxy"
 	"http-proxy/pkg/repo"
 	"http-proxy/pkg/server"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
@@ -15,11 +19,27 @@ func main() {
 		return
 	}
 
-	handler, err := proxy.NewHandler(repo.NewMongoRequestSaver(mongoConn), repo.NewMongoResponseSaver(mongoConn))
+	requests := repo.NewMongoRequestSaver(mongoConn)
+	responses := repo.NewMongoResponseSaver(mongoConn)
+
+	handler, err := proxy.NewHandler(requests, responses)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	go startHttpApi(requests, responses)
+
 	server.Run(8080, handler.Handle)
+}
+
+func startHttpApi(req repo.RequestSaver, resp repo.ResponseSaver) {
+	router := mux.NewRouter()
+	handler := api.NewHandler(req, resp)
+
+	router.HandleFunc("/requests", handler.ListRequests)
+	router.HandleFunc("/requests/{id}", handler.GetRequest)
+	router.HandleFunc("/repeat/{id}", handler.RepeatRequest)
+
+	http.ListenAndServe(":8000", router)
 }

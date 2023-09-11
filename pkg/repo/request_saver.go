@@ -3,11 +3,8 @@ package repo
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -65,11 +62,8 @@ func (s *MongoRequestSaver) Save(req *http.Request) (string, error) {
 	return res.InsertedID.(primitive.ObjectID).Hex(), nil
 }
 
-func (s *MongoRequestSaver) Get(id string) (*http.Request, error) {
-	res := s.requests.FindOne(context.Background(), bson.D{{Key: "_id", Value: id}})
-	value := bson.M{}
-
-	err := res.Decode(value)
+func (s *MongoRequestSaver) GetEncoded(id string) (*http.Request, error) {
+	value, err := s.Get(id)
 	if err != nil {
 		return nil, err
 	}
@@ -77,88 +71,43 @@ func (s *MongoRequestSaver) Get(id string) (*http.Request, error) {
 	return toRequest(value)
 }
 
-func toRequest(value bson.M) (*http.Request, error) {
-	return nil, nil
-}
-
-func (s *MongoRequestSaver) List(limit int64) ([]*http.Request, error) {
-	ctx := context.Background()
-
-	cursor, err := s.requests.Find(ctx, bson.D{}, options.Find().SetLimit(limit))
+func (s *MongoRequestSaver) Get(id string) (*RequestData, error) {
+	objectId, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]*http.Request, limit/4)
+	res := s.requests.FindOne(context.Background(), bson.D{{Key: "_id", Value: objectId}})
+	value := &RequestData{}
+
+	err = res.Decode(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
+}
+
+func (s *MongoRequestSaver) List(limit int64) ([]*RequestData, error) {
+	ctx := context.Background()
+
+	opts := options.Find().SetLimit(limit).SetSort(bson.D{{Key: "_id", Value: -1}})
+	cursor, err := s.requests.Find(ctx, bson.D{}, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]*RequestData, limit/4)
 
 	for cursor.Next(ctx) {
-		value := bson.M{}
+		value := &RequestData{}
 		err = cursor.Decode(value)
 		if err != nil {
 			return nil, err
 		}
 
-		req, err := toRequest(value)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, req)
+		res = append(res, value)
 	}
 
 	return res, nil
-}
-
-func parseHeaders(headers http.Header) bson.M {
-	res := toBson(headers)
-	delete(res, "Cookie")
-	return res
-}
-
-func parseQuery(input *url.URL) bson.M {
-	input.RawQuery = strings.ReplaceAll(input.RawQuery, ";", "&")
-	res := toBson(input.Query())
-	return res
-}
-
-func toBson(values map[string][]string) bson.M {
-	res := bson.M{}
-	for key, value := range values {
-		if len(value) == 1 {
-			res[key] = value[0]
-		} else {
-			res[key] = value
-		}
-	}
-	return res
-}
-
-func parseCookies(cookies []*http.Cookie) map[string]string {
-	res := make(map[string]string, 4)
-
-	for _, cookie := range cookies {
-		res[cookie.Name] = cookie.Value
-	}
-
-	return res
-}
-
-const maxMemory = 5 * 1024 * 1024 * 1024
-
-func parsePostParams(req *http.Request) (bson.M, error) {
-	if req.Body == nil {
-		return nil, nil
-	}
-
-	err := func() error {
-		if strings.HasPrefix(req.Header.Get("Content-Type"), "multipart/form-data") {
-			return req.ParseMultipartForm(maxMemory)
-		}
-		return req.ParseForm()
-	}()
-	if err != nil {
-		fmt.Println()
-		return nil, err
-	}
-
-	return toBson(req.PostForm), nil
 }

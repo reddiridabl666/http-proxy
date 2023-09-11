@@ -19,6 +19,11 @@ func WriteError(err error, conn net.Conn) {
 	WriteResponse(resp, conn)
 }
 
+func HttpError(err error, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte(err.Error()))
+}
+
 func PrintRequest(r *http.Request) {
 	bytes, _ := httputil.DumpRequest(r, true)
 	fmt.Println(string(bytes))
