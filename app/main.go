@@ -41,5 +41,9 @@ func startHttpApi(req repo.RequestSaver, resp repo.ResponseSaver) {
 	router.HandleFunc("/requests/{id}", handler.GetRequest)
 	router.HandleFunc("/repeat/{id}", handler.RepeatRequest)
 
+	router.HandleFunc("/responses", handler.ListResponses)
+	router.HandleFunc("/responses/{id}", handler.GetResponse)
+	router.HandleFunc("/requests/{id}/response", handler.GetRequestResponse)
+
 	http.ListenAndServe(":8000", router)
 }
