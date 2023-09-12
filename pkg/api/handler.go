@@ -9,6 +9,7 @@ import (
 
 	"http-proxy/pkg/repo"
 	"http-proxy/pkg/utils"
+	"http-proxy/pkg/xxe"
 
 	"github.com/gorilla/mux"
 )
@@ -72,6 +73,31 @@ func (h *Handler) RepeatRequest(w http.ResponseWriter, r *http.Request) {
 		utils.HttpError(errors.New("Error getting request: "+err.Error()), w)
 		return
 	}
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		utils.HttpError(errors.New("Error resending request: "+err.Error()), w)
+		return
+	}
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		utils.HttpError(errors.New("Error resending request: "+err.Error()), w)
+		return
+	}
+
+	w.WriteHeader(resp.StatusCode)
+	w.Write(bytes)
+}
+
+func (h *Handler) ScanRequest(w http.ResponseWriter, r *http.Request) {
+	req, err := h.requests.GetEncoded(mux.Vars(r)["id"])
+	if err != nil {
+		utils.HttpError(errors.New("Error getting request: "+err.Error()), w)
+		return
+	}
+
+	xxe.AddVulnerability(req)
 
 	resp, err := h.client.Do(req)
 	if err != nil {
