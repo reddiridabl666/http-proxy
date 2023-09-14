@@ -105,14 +105,19 @@ func (h *Handler) ScanRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		utils.HttpError(errors.New("Error resending request: "+err.Error()), w)
 		return
 	}
 
-	w.WriteHeader(resp.StatusCode)
-	w.Write(bytes)
+	if xxe.IsVulnerable(body) {
+		body = []byte("Request vulnerable, response:\n" + string(body))
+	} else {
+		body = []byte("Request is not vulnerable\n")
+	}
+
+	w.Write(body)
 }
 
 func (h *Handler) GetResponse(w http.ResponseWriter, r *http.Request) {
