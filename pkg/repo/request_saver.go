@@ -34,6 +34,7 @@ func (s *MongoRequestSaver) Save(req *http.Request) (string, error) {
 
 	value := bson.M{
 		"method":     req.Method,
+		"scheme":     req.URL.Scheme,
 		"host":       req.Host,
 		"path":       req.URL.Path,
 		"get_params": parseQuery(req.URL),
@@ -45,7 +46,7 @@ func (s *MongoRequestSaver) Save(req *http.Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if postParams != nil {
+	if len(postParams) != 0 {
 		value["post_params"] = postParams
 		req.Body = io.NopCloser(bytes.NewReader(body))
 	} else {

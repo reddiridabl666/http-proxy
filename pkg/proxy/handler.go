@@ -68,16 +68,20 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 			return err
 		}
 
+		toProxy.URL.Scheme = "https"
 		hostConn, err = utils.TlsConnect(host, port)
 		if err != nil {
 			return err
 		}
 	} else {
+		toProxy.URL.Scheme = "http"
 		hostConn, err = utils.TcpConnect(host, port)
 		if err != nil {
 			return err
 		}
 	}
+
+	defer hostConn.Close()
 
 	prepareRequest(toProxy)
 	requestId, err := h.requestSaver.Save(toProxy)

@@ -14,10 +14,6 @@ const kVulnerability = `
 
 var kXMLStart []byte = []byte("<?xml")
 
-func hasXML(body []byte) bool {
-	return bytes.Contains(body, kXMLStart)
-}
-
 func AddVulnerability(req *http.Request) (bool, error) {
 	hadXML := false
 	body, err := io.ReadAll(req.Body)
@@ -25,11 +21,12 @@ func AddVulnerability(req *http.Request) (bool, error) {
 		return hadXML, err
 	}
 
-	if hasXML(body) {
+	xmlStart := bytes.Index(body, kXMLStart)
+
+	if xmlStart != -1 {
 		hadXML = true
-		xmlStart := bytes.Index(body, kXMLStart)
 		idx := xmlStart + bytes.IndexByte(body[xmlStart:], '>')
-		body = bytes.Join([][]byte{body[:idx+1], []byte(kVulnerability), body[idx+1:]}, []byte{})
+		body = bytes.Join([][]byte{body[:idx+1], []byte(kVulnerability)}, []byte{})
 	}
 
 	req.Body = io.NopCloser(bytes.NewReader(body))

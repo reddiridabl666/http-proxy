@@ -35,17 +35,24 @@ func main() {
 
 func startHttpApi(req repo.RequestSaver, resp repo.ResponseSaver) {
 	router := mux.NewRouter()
-	handler := api.NewHandler(req, resp)
+
+	handler, err := api.NewHandler(req, resp)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	router.HandleFunc("/requests", handler.ListRequests)
 	router.HandleFunc("/requests/{id}", handler.GetRequest)
 	router.HandleFunc("/repeat/{id}", handler.RepeatRequest)
 	router.HandleFunc("/scan/{id}", handler.ScanRequest)
-	router.HandleFunc("/dump/{id}", handler.DumpRequest)
+	router.HandleFunc("/requests/{id}/dump", handler.DumpRequest)
 
 	router.HandleFunc("/responses", handler.ListResponses)
 	router.HandleFunc("/responses/{id}", handler.GetResponse)
 	router.HandleFunc("/requests/{id}/response", handler.GetRequestResponse)
+
+	fmt.Println("Api listening at port 8000...")
 
 	http.ListenAndServe(":8000", router)
 }

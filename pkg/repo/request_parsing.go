@@ -10,7 +10,7 @@ import (
 )
 
 func toRequest(data *RequestData) (*http.Request, error) {
-	res, err := http.NewRequest(data.Method, "http://"+data.Host+data.Path, nil)
+	res, err := http.NewRequest(data.Method, data.Scheme+"://"+data.Host+data.Path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,6 @@ func toRequest(data *RequestData) (*http.Request, error) {
 
 	res.Header = fromBson(data.Headers)
 	addCookies(res, data.Cookies)
-	// res.Header.Set("Cookie", encodeCookies(data.Cookies))
 	res.URL.RawQuery = makeQuery(fromBson(data.GetParams))
 	res.Body = getBody(res, data)
 
@@ -31,19 +30,6 @@ func addCookies(req *http.Request, cookies map[string]string) {
 		req.AddCookie(&http.Cookie{Name: key, Value: value})
 	}
 }
-
-// func encodeCookies(cookies map[string]string) string {
-// 	if len(cookies) == 0 {
-// 		return ""
-// 	}
-
-// 	cookieString := ""
-
-// 	for key, value := range cookies {
-// 		cookieString += fmt.Sprintf("%s=%s; ", key, value)
-// 	}
-// 	return strings.TrimSuffix(cookieString, "; ")
-// }
 
 func makeQuery(values map[string][]string) string {
 	return url.Values(values).Encode()

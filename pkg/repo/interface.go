@@ -25,6 +25,7 @@ const kDatabase = "http-proxy"
 
 type RequestData struct {
 	Id         primitive.ObjectID `json:"id" bson:"_id"`
+	Scheme     string             `json:"scheme"`
 	Host       string             `json:"host"`
 	Method     string             `json:"method"`
 	Path       string             `json:"path"`
