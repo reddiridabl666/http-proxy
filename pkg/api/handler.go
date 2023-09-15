@@ -138,6 +138,11 @@ func (h *Handler) ScanRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !hadXML {
+		w.Write([]byte("No xml in request\n"))
+		return
+	}
+
 	resp, err := h.client.Do(req)
 	if err != nil {
 		utils.HttpError(errors.New("Error resending request: "+err.Error()), w)
@@ -166,13 +171,14 @@ func (h *Handler) GetResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, err := json.Marshal(req)
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+
+	err = encoder.Encode(req)
 	if err != nil {
 		utils.HttpError(err, w)
 		return
 	}
-
-	w.Write(bytes)
 }
 
 func (h *Handler) GetRequestResponse(w http.ResponseWriter, r *http.Request) {
@@ -182,13 +188,14 @@ func (h *Handler) GetRequestResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, err := json.Marshal(req)
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+
+	err = encoder.Encode(req)
 	if err != nil {
 		utils.HttpError(err, w)
 		return
 	}
-
-	w.Write(bytes)
 }
 
 func (h *Handler) ListResponses(w http.ResponseWriter, r *http.Request) {
@@ -203,11 +210,12 @@ func (h *Handler) ListResponses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytes, err := json.Marshal(requests)
+	encoder := json.NewEncoder(w)
+	encoder.SetEscapeHTML(false)
+
+	err = encoder.Encode(requests)
 	if err != nil {
 		utils.HttpError(err, w)
 		return
 	}
-
-	w.Write(bytes)
 }

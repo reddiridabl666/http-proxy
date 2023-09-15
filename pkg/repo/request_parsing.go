@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -128,7 +127,6 @@ func parsePostParams(req *http.Request) (bson.M, error) {
 
 	err := req.ParseForm()
 	if err != nil {
-		fmt.Println()
 		return nil, err
 	}
 
