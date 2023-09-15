@@ -40,6 +40,8 @@ func startHttpApi(req repo.RequestSaver, resp repo.ResponseSaver) {
 	router.HandleFunc("/requests", handler.ListRequests)
 	router.HandleFunc("/requests/{id}", handler.GetRequest)
 	router.HandleFunc("/repeat/{id}", handler.RepeatRequest)
+	router.HandleFunc("/scan/{id}", handler.ScanRequest)
+	router.HandleFunc("/dump/{id}", handler.DumpRequest)
 
 	router.HandleFunc("/responses", handler.ListResponses)
 	router.HandleFunc("/responses/{id}", handler.GetResponse)

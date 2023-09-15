@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"bufio"
+	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -8,6 +11,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 )
 
 func WriteError(err error, conn net.Conn) {
@@ -57,4 +61,34 @@ func GetPort(url *url.URL) string {
 	}
 
 	return port
+}
+
+func SendRequest(conn net.Conn, req *http.Request) (*http.Response, error) {
+	bytes, err := httputil.DumpRequest(req, true)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = conn.Write(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return http.ReadResponse(bufio.NewReader(conn), req)
+}
+
+const DefaultTimeout = time.Second * 10
+
+func TcpConnect(host, port string) (net.Conn, error) {
+	return net.DialTimeout("tcp", host+":"+port, DefaultTimeout)
+}
+
+func TlsConnect(host, port string) (net.Conn, error) {
+	dialer := tls.Dialer{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+	defer cancel()
+	conn, err := dialer.DialContext(ctx, "tcp", host+":"+port)
+
+	return conn, err
 }

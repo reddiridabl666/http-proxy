@@ -54,8 +54,6 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 	var hostConn net.Conn
 	var err error
 
-	// utils.PrintRequest(toProxy)
-
 	host := toProxy.URL.Hostname()
 	port := utils.GetPort(toProxy.URL)
 
@@ -65,19 +63,17 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 			return err
 		}
 
-		// fmt.Println("Reading the actual request")
 		toProxy, err = http.ReadRequest(bufio.NewReader(clientConn))
 		if err != nil {
 			return err
 		}
 
-		// fmt.Println("Connecting to host: " + host)
-		hostConn, err = tlsConnect(host, port)
+		hostConn, err = utils.TlsConnect(host, port)
 		if err != nil {
 			return err
 		}
 	} else {
-		hostConn, err = tcpConnect(host, port)
+		hostConn, err = utils.TcpConnect(host, port)
 		if err != nil {
 			return err
 		}
@@ -89,8 +85,7 @@ func (h *Handler) handleRequest(clientConn net.Conn, toProxy *http.Request) erro
 		return err
 	}
 
-	// fmt.Println("Proxying request to host: " + host + "\n")
-	resp, err := sendRequest(hostConn, toProxy)
+	resp, err := utils.SendRequest(hostConn, toProxy)
 	if err != nil {
 		return err
 	}
@@ -127,7 +122,7 @@ func (h *Handler) tlsUpgrade(clientConn net.Conn, host string) (net.Conn, error)
 	}
 
 	tlsConn := tls.Server(clientConn, cfg)
-	clientConn.SetReadDeadline(time.Now().Add(defaultTimeout))
+	clientConn.SetReadDeadline(time.Now().Add(utils.DefaultTimeout))
 
 	return tlsConn, nil
 }
@@ -147,4 +142,10 @@ func (h *Handler) generateCertificate(host string) error {
 	}
 
 	return nil
+}
+
+func prepareRequest(r *http.Request) {
+	r.URL.Host = ""
+	r.Header.Del("Proxy-Connection")
+	r.Header.Del("Accept-Encoding")
 }
